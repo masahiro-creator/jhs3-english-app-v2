@@ -1,7 +1,15 @@
 #!/usr/bin/env node
-// Google Cloud Text-to-Speech (en-US-Chirp3-HD-Zephyr) で単語・例文の音声ファイルを
+// Google Cloud Text-to-Speech (en-US-Neural2-F) で単語・例文の音声ファイルを
 // 事前生成するスクリプト。アプリの実行時にはAPIを呼び出さない
 // （一度だけ実行してaudio/以下にmp3を生成する。Web Speech APIへのフォールバックは無し）。
+//
+// 声の選定メモ: en-US-Chirp3-HD-Zephyr の方が声の自然さ・聞き取りやすさは上だったが、
+// 不規則動詞3活用「put, put, put.」のような同一語の繰り返しに対して、冒頭の無音の長さが
+// 単語ごとにランダムにばらつき（0.3〜0.8秒とバラバラ）、その分だけ実際の発話が
+// 圧縮されてテンポが不揃いになる問題があった。SSMLのbreakタグでの制御も試したが、
+// 指定時間（400ms）通りに反映されず（実際は900ms近くになる）信頼できなかった。
+// Neural2-F は同じテキストに対して無音区間の位置・長さが一貫しており、
+// テンポの均一性を優先してこちらを採用している。
 //
 // 使い方:
 //   GOOGLE_TTS_API_KEY=xxxxx node scripts/generate-audio.js
@@ -82,7 +90,7 @@ fs.mkdirSync(outDir, { recursive: true });
 function synthesize(text) {
   const body = JSON.stringify({
     input: { text },
-    voice: { languageCode: 'en-US', name: 'en-US-Chirp3-HD-Zephyr' },
+    voice: { languageCode: 'en-US', name: 'en-US-Neural2-F' },
     audioConfig: { audioEncoding: 'MP3', speakingRate: 1.0, pitch: 0 },
   });
 
