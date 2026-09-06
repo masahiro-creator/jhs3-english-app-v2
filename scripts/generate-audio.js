@@ -35,6 +35,7 @@ if (!API_KEY) {
 }
 
 const VOICE_NAME = process.env.TTS_VOICE_NAME || 'en-US-Neural2-F';
+const LANGUAGE_CODE = process.env.TTS_LANGUAGE_CODE || (VOICE_NAME.startsWith('en-GB') ? 'en-GB' : 'en-US');
 const OUT_DIR_NAME = process.env.TTS_OUT_DIR || 'audio';
 const MANIFEST_PATH = process.env.TTS_MANIFEST_PATH || 'js/data/audioManifest.js';
 const MANIFEST_VAR = process.env.TTS_MANIFEST_VAR || 'AUDIO_MANIFEST';
@@ -106,7 +107,7 @@ fs.mkdirSync(outDir, { recursive: true });
 function synthesize(text) {
   const body = JSON.stringify({
     input: { text },
-    voice: { languageCode: 'en-US', name: VOICE_NAME },
+    voice: { languageCode: LANGUAGE_CODE, name: VOICE_NAME },
     audioConfig: { audioEncoding: 'MP3', speakingRate: 1.0, pitch: 0 },
   });
 

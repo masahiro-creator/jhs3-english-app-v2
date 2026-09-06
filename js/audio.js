@@ -1,22 +1,33 @@
 // 発音再生モジュール
 // 全ての単語・例文・不規則動詞はGoogle Cloud TTSで事前生成した音声ファイルを再生する。
-// 女性声(en-US-Neural2-F): audio/, js/data/audioManifest.js
-// 男性声(en-US-Neural2-D): audio-male/, js/data/audioManifestMale.js
+// 選択できる声(4種):
+//   us-female (デフォルト): en-US-Neural2-F  -> audio/,       js/data/audioManifest.js
+//   us-male:               en-US-Neural2-D  -> audio-male/,  js/data/audioManifestMale.js
+//   gb-female:              en-GB-Neural2-A  -> audio-gb-a/,  js/data/audioManifestGbA.js
+//   gb-male:                en-GB-Neural2-B  -> audio-gb-b/,  js/data/audioManifestGbB.js
 // 端末やブラウザに依存する声のばらつきをなくすため、Web Speech APIへの
 // フォールバックは行わない。
 window.AudioEngine = {
   speechRate: 1.5, // 聞き取りやすいクリアな速度（標準ボタンと同じ1.5倍。単語・不規則動詞3活用に適用）
-  exampleRateScale: 0.75, // 例文は単語より情報量が多く速く感じるため、speechRateにこの倍率をかけて再生
+  exampleRateScale: 0.675, // 例文は単語より情報量が多く速く感じるため、speechRateにこの倍率をかけて再生
   autoPlay: true,   // 単語切り替え時の自動発音再生 (デフォルト: ON)
-  voiceGender: 'female', // 'female' (デフォルト) または 'male'
+  voiceId: 'us-female', // 'us-female' (デフォルト) / 'us-male' / 'gb-female' / 'gb-male'
 
   _currentAudio: null,
+
+  _voiceManifestGetters: {
+    'us-female': () => window.AUDIO_MANIFEST,
+    'us-male': () => window.AUDIO_MANIFEST_MALE,
+    'gb-female': () => window.AUDIO_MANIFEST_GB_A,
+    'gb-male': () => window.AUDIO_MANIFEST_GB_B,
+  },
 
   /**
    * 現在選択中の声のmanifestを返す
    */
   _getManifest() {
-    return this.voiceGender === 'male' ? window.AUDIO_MANIFEST_MALE : window.AUDIO_MANIFEST;
+    const getter = this._voiceManifestGetters[this.voiceId] || this._voiceManifestGetters['us-female'];
+    return getter();
   },
 
   /**
@@ -116,9 +127,9 @@ window.AudioEngine = {
   },
 
   /**
-   * 声の性別を切り替え ('female' または 'male')
+   * 声を切り替え ('us-female' / 'us-male' / 'gb-female' / 'gb-male')
    */
-  setVoice(gender) {
-    this.voiceGender = gender === 'male' ? 'male' : 'female';
+  setVoice(voiceId) {
+    this.voiceId = this._voiceManifestGetters[voiceId] ? voiceId : 'us-female';
   }
 };
