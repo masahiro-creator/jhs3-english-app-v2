@@ -15,6 +15,14 @@
 //   GOOGLE_TTS_API_KEY=xxxxx node scripts/generate-audio.js
 //
 // 再生成が必要になったとき（単語・例文を追加/変更したとき）に再実行する。
+//
+// 声を切り替えたい場合（例: 男性声セットを追加）は環境変数で出力先を変える。
+//   GOOGLE_TTS_API_KEY=xxxxx \
+//   TTS_VOICE_NAME=en-US-Neural2-D \
+//   TTS_OUT_DIR=audio-male \
+//   TTS_MANIFEST_PATH=js/data/audioManifestMale.js \
+//   TTS_MANIFEST_VAR=AUDIO_MANIFEST_MALE \
+//   node scripts/generate-audio.js
 
 const fs = require('fs');
 const path = require('path');
@@ -25,6 +33,11 @@ if (!API_KEY) {
   console.error('環境変数 GOOGLE_TTS_API_KEY を設定してください。');
   process.exit(1);
 }
+
+const VOICE_NAME = process.env.TTS_VOICE_NAME || 'en-US-Neural2-F';
+const OUT_DIR_NAME = process.env.TTS_OUT_DIR || 'audio';
+const MANIFEST_PATH = process.env.TTS_MANIFEST_PATH || 'js/data/audioManifest.js';
+const MANIFEST_VAR = process.env.TTS_MANIFEST_VAR || 'AUDIO_MANIFEST';
 
 const ROOT = path.join(__dirname, '..');
 
@@ -85,15 +98,15 @@ verbs.forEach((v) => {
   addEntry(v.example, `verb-${v.id}-example`, 'example');
 });
 
-console.log(`生成対象: ${entries.size} 件`);
+console.log(`生成対象: ${entries.size} 件 (声: ${VOICE_NAME}, 出力先: ${OUT_DIR_NAME}/)`);
 
-const outDir = path.join(ROOT, 'audio');
+const outDir = path.join(ROOT, OUT_DIR_NAME);
 fs.mkdirSync(outDir, { recursive: true });
 
 function synthesize(text) {
   const body = JSON.stringify({
     input: { text },
-    voice: { languageCode: 'en-US', name: 'en-US-Neural2-F' },
+    voice: { languageCode: 'en-US', name: VOICE_NAME },
     audioConfig: { audioEncoding: 'MP3', speakingRate: 1.0, pitch: 0 },
   });
 
@@ -141,10 +154,10 @@ async function main() {
     const filePath = path.join(outDir, filename);
 
     // 既に生成済みなら再利用（API課金・呼び出し回数を節約。強制再生成したい場合は
-    // audio/ 内の該当ファイルを削除してから実行する）
+    // 出力先フォルダ内の該当ファイルを削除してから実行する）
     if (fs.existsSync(filePath)) {
       process.stdout.write(`[${i}/${entries.size}] (再利用) ${text}\n`);
-      manifest[text] = { path: `audio/${filename}`, type };
+      manifest[text] = { path: `${OUT_DIR_NAME}/${filename}`, type };
       continue;
     }
 
@@ -152,7 +165,7 @@ async function main() {
     try {
       const audioContentB64 = await synthesize(text);
       fs.writeFileSync(filePath, Buffer.from(audioContentB64, 'base64'));
-      manifest[text] = { path: `audio/${filename}`, type };
+      manifest[text] = { path: `${OUT_DIR_NAME}/${filename}`, type };
     } catch (err) {
       failures.push({ text, error: err.message });
       console.error(`  失敗: ${err.message}`);
@@ -160,12 +173,13 @@ async function main() {
     await new Promise((r) => setTimeout(r, 30));
   }
 
-  const manifestPath = path.join(ROOT, 'js/data/audioManifest.js');
+  const manifestPath = path.join(ROOT, MANIFEST_PATH);
+  fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   fs.writeFileSync(
     manifestPath,
-    `// 自動生成ファイル: scripts/generate-audio.js で作成\n` +
+    `// 自動生成ファイル: scripts/generate-audio.js で作成 (声: ${VOICE_NAME})\n` +
       `// Google Cloud Text-to-Speechで事前生成した音声の (発音テキスト -> mp3パス) マッピング\n` +
-      `window.AUDIO_MANIFEST = ${JSON.stringify(manifest, null, 2)};\n`
+      `window.${MANIFEST_VAR} = ${JSON.stringify(manifest, null, 2)};\n`
   );
 
   console.log(`\n完了: ${entries.size - failures.length}/${entries.size} 件成功`);

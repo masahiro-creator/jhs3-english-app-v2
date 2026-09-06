@@ -42,6 +42,10 @@
               <button class="speed-btn" style="padding: 4px 8px; font-size: 11px; border-radius: 12px; border: none; background: var(--theme-btn-grad); color: #fff; cursor: pointer;" onclick="window.AudioEngine.setRate(1.5); this.parentNode.querySelectorAll('button').forEach(b => b.style.background='transparent'); this.style.background='var(--theme-btn-grad)';">✨ 標準</button>
               <button class="speed-btn" style="padding: 4px 8px; font-size: 11px; border-radius: 12px; border: none; background: transparent; color: #fff; cursor: pointer;" onclick="window.AudioEngine.setRate(1.8); this.parentNode.querySelectorAll('button').forEach(b => b.style.background='transparent'); this.style.background='var(--theme-btn-grad)';">🐰 早め</button>
             </div>
+            <div style="display: flex; gap: 4px; background: rgba(0, 0, 0, 0.2); padding: 4px; border-radius: 20px; border: 1px solid var(--theme-card-border);">
+              <button class="voice-btn" style="padding: 4px 8px; font-size: 11px; border-radius: 12px; border: none; background: var(--theme-btn-grad); color: #fff; cursor: pointer;" onclick="window.AudioEngine.setVoice('female'); this.parentNode.querySelectorAll('button').forEach(b => b.style.background='transparent'); this.style.background='var(--theme-btn-grad)';">👩 女性の声</button>
+              <button class="voice-btn" style="padding: 4px 8px; font-size: 11px; border-radius: 12px; border: none; background: transparent; color: #fff; cursor: pointer;" onclick="window.AudioEngine.setVoice('male'); this.parentNode.querySelectorAll('button').forEach(b => b.style.background='transparent'); this.style.background='var(--theme-btn-grad)';">👨 男性の声</button>
+            </div>
           </div>
         </div>
 
@@ -92,6 +96,7 @@
   <script src="js/data/verbs.js"></script>
   <script src="js/data/words.js"></script>
   <script src="js/data/audioManifest.js"></script>
+  <script src="js/data/audioManifestMale.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/srsEngine.js"></script>
