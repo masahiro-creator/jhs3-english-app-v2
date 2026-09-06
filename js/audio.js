@@ -1,17 +1,22 @@
 // 発音再生モジュール
 // 全ての単語・例文・不規則動詞はGoogle Cloud TTSで事前生成した音声ファイルを再生する。
-// 選択できる声(4種):
-//   us-female (デフォルト): en-US-Neural2-F  -> audio/,       js/data/audioManifest.js
-//   us-male:               en-US-Neural2-D  -> audio-male/,  js/data/audioManifestMale.js
-//   gb-female:              en-GB-Neural2-A  -> audio-gb-a/,  js/data/audioManifestGbA.js
-//   gb-male:                en-GB-Neural2-B  -> audio-gb-b/,  js/data/audioManifestGbB.js
+// 選択できる声(6種):
+//   us-female (デフォルト): en-US-Neural2-F      -> audio/,              js/data/audioManifest.js
+//   us-male:               en-US-Neural2-D      -> audio-male/,         js/data/audioManifestMale.js
+//   gb-female:              en-GB-Neural2-A      -> audio-gb-a/,         js/data/audioManifestGbA.js
+//   gb-male:                en-GB-Neural2-B      -> audio-gb-b/,         js/data/audioManifestGbB.js
+//   chirp-female:           en-US-Chirp3-HD-Sulafat -> audio-chirp-female/, js/data/audioManifestChirpFemale.js
+//   chirp-male:             en-US-Chirp3-HD-Orus    -> audio-chirp-male/,   js/data/audioManifestChirpMale.js
+// Chirp3-HD系のみ、不規則動詞3活用を単語ごとに個別生成→固定間隔で結合する方式
+// (scripts/generate-audio-chirp.js)で作っている。1回のAPI呼び出しで
+// "put, put, put." のように読ませると冒頭の無音がランダムにばらついてしまうため。
 // 端末やブラウザに依存する声のばらつきをなくすため、Web Speech APIへの
 // フォールバックは行わない。
 window.AudioEngine = {
   speechRate: 1.5, // 聞き取りやすいクリアな速度（標準ボタンと同じ1.5倍。単語・不規則動詞3活用に適用）
   exampleRateScale: 0.675, // 例文は単語より情報量が多く速く感じるため、speechRateにこの倍率をかけて再生
   autoPlay: true,   // 単語切り替え時の自動発音再生 (デフォルト: ON)
-  voiceId: 'us-female', // 'us-female' (デフォルト) / 'us-male' / 'gb-female' / 'gb-male'
+  voiceId: 'us-female', // 'us-female' (デフォルト) / 'us-male' / 'gb-female' / 'gb-male' / 'chirp-female' / 'chirp-male'
 
   _currentAudio: null,
 
@@ -20,6 +25,8 @@ window.AudioEngine = {
     'us-male': () => window.AUDIO_MANIFEST_MALE,
     'gb-female': () => window.AUDIO_MANIFEST_GB_A,
     'gb-male': () => window.AUDIO_MANIFEST_GB_B,
+    'chirp-female': () => window.AUDIO_MANIFEST_CHIRP_FEMALE,
+    'chirp-male': () => window.AUDIO_MANIFEST_CHIRP_MALE,
   },
 
   /**
