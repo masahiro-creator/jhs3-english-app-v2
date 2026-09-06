@@ -1,88 +1,16 @@
-// Web Speech API 発音再生モジュール (iPadOS/Safari/Chrome 完全対応)
+// 発音再生モジュール
+// 全ての単語・例文・不規則動詞はGoogle Cloud TTS(en-US-Chirp3-HD-Zephyr)で
+// 事前生成した音声ファイル(audio/, js/data/audioManifest.js)を再生する。
+// 端末やブラウザに依存する声のばらつきをなくすため、Web Speech APIへの
+// フォールバックは行わない。
 window.AudioEngine = {
   speechRate: 1.5, // 聞き取りやすいクリアな速度（標準ボタンと同じ1.5倍）
   autoPlay: true,   // 単語切り替え時の自動発音再生 (デフォルト: ON)
 
-  _voices: [],
-  _voicesReady: null,
+  _currentAudio: null,
 
   /**
-   * 現時点で取得できる音声一覧をキャッシュに反映
-   */
-  _loadVoices() {
-    this._voices = window.speechSynthesis.getVoices();
-    return this._voices;
-  },
-
-  /**
-   * 音声リストの読み込み完了を待つ
-   * iOS Safariは初回アクセス時に getVoices() が空配列を返すことがあり、
-   * その状態で発音すると声を選べずOS標準（男声になることがある）にフォールバックしてしまう。
-   * voiceschanged を待つか、最大1.5秒でタイムアウトして進める。
-   */
-  _ensureVoicesReady() {
-    if (this._voicesReady) return this._voicesReady;
-
-    this._voicesReady = new Promise((resolve) => {
-      const existing = this._loadVoices();
-      if (existing.length > 0) {
-        resolve(existing);
-        return;
-      }
-
-      const onChanged = () => {
-        window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
-        clearTimeout(timeoutId);
-        resolve(this._loadVoices());
-      };
-      window.speechSynthesis.addEventListener('voiceschanged', onChanged);
-
-      const timeoutId = setTimeout(() => {
-        window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
-        resolve(this._loadVoices());
-      }, 1500);
-    });
-
-    return this._voicesReady;
-  },
-
-  /**
-   * 女性の声を優先して選択（端末・ブラウザごとに声の名前が異なるため候補を広めに用意）
-   */
-  _pickVoice(voices) {
-    const preferredVoices = [
-      'Google US English',      // PC(Chrome)の女性
-      'Microsoft Zira',         // PC(Windows)の女性
-      'Microsoft Aria',         // PC(Windows 新)の女性
-      'Samantha',               // iOS/macOSの標準女性
-      'Ava',                    // iOS/macOSの女性（新しめ）
-      'Allison',                // iOS/macOSの女性
-      'Susan',                  // iOS/macOSの女性
-      'Victoria',               // iOS/macOSの女性
-      'Karen',                  // iOS/macOSの女性（豪州）
-      'Moira',                  // iOS/macOSの女性（アイルランド）
-      'Tessa',                  // iOS/macOSの女性（南ア）
-      'Serena',                 // iOS/macOSの女性（英）
-      'Fiona',                  // iOS/macOSの女性（スコットランド）
-      'Kate',                   // iOS/macOSの女性（英）
-      'Zoe',                    // iOS/macOSの女性
-      'Google UK English Female'
-    ];
-
-    for (const name of preferredVoices) {
-      const found = voices.find(v => v.lang.startsWith('en') && v.name.includes(name));
-      if (found) return found;
-    }
-
-    // 候補にない場合も、できるだけ en-US の声から選ぶ
-    return voices.find(v => v.lang === 'en-US') ||
-           voices.find(v => v.lang.startsWith('en')) ||
-           null;
-  },
-
-  /**
-   * 事前生成済み音声（Google Cloud TTS）を再生。テキストが manifest にあればそちらを優先し、
-   * 端末やブラウザに依存せず全端末で同じ高品質な声で再生する。
+   * 事前生成済み音声を再生
    */
   _playPregenerated(filePath, rate, onEnd) {
     if (this._currentAudio) {
@@ -112,44 +40,15 @@ window.AudioEngine = {
     const cleanText = text.replace(/~ing|~|\(.*\)/g, '').replace(/\//g, ' ').trim();
     const rate = customRate || this.speechRate;
 
-    // Google Cloud TTSで事前生成した音声があれば、端末に依存せずそちらを再生
     const manifest = window.AUDIO_MANIFEST;
-    if (manifest && manifest[cleanText]) {
-      // 再生中のWeb Speech APIをキャンセルしてから再生
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-      this._playPregenerated(manifest[cleanText], rate, onEnd);
-      return;
-    }
-
-    if (!('speechSynthesis' in window)) {
-      console.warn('Speech Synthesis API に未対応のブラウザです。');
+    const filePath = manifest && manifest[cleanText];
+    if (!filePath) {
+      console.warn(`事前生成音声が見つかりません: "${cleanText}"`);
       if (onEnd) onEnd();
       return;
     }
 
-    // 再生中の音声をキャンセル
-    window.speechSynthesis.cancel();
-
-    this._ensureVoicesReady().then((voices) => {
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = 'en-US';
-      utterance.rate = rate;
-      utterance.pitch = 1.0;
-
-      const englishVoice = this._pickVoice(voices);
-      if (englishVoice) {
-        utterance.voice = englishVoice;
-      }
-
-      if (onEnd) {
-        utterance.onend = onEnd;
-        utterance.onerror = onEnd;
-      }
-
-      window.speechSynthesis.speak(utterance);
-    });
+    this._playPregenerated(filePath, rate, onEnd);
   },
 
   /**
@@ -157,11 +56,6 @@ window.AudioEngine = {
    * (カンマを挟むことで "have, had, had." のように早口にならず1語ずつハッキリ朗読)
    */
   speakVerbForms(present, past, participle, onComplete = null) {
-    if (!('speechSynthesis' in window)) {
-      if (onComplete) onComplete();
-      return;
-    }
-
     let cleanPresent = present.replace(/~ing|~|\(.*\)/g, '').trim();
     let cleanPast = past.replace(/~ing|~|\(.*\)/g, '').trim();
     let cleanParticiple = participle.replace(/~ing|~|\(.*\)/g, '').trim();
@@ -208,11 +102,3 @@ window.AudioEngine = {
     this.speechRate = rate;
   }
 };
-
-// iOS Safari での getVoices 読み込み待機対策（ページ読み込み時点で先読みしておく）
-if ('speechSynthesis' in window) {
-  window.AudioEngine._loadVoices();
-  window.speechSynthesis.addEventListener('voiceschanged', () => {
-    window.AudioEngine._loadVoices();
-  });
-}

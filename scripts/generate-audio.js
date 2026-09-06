@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Google Cloud Text-to-Speech で単語・例文の音声ファイルを事前生成するスクリプト。
-// アプリの実行時にはAPIを呼び出さない（一度だけ実行してaudio/以下にmp3を生成する）。
+// Google Cloud Text-to-Speech (en-US-Chirp3-HD-Zephyr) で単語・例文の音声ファイルを
+// 事前生成するスクリプト。アプリの実行時にはAPIを呼び出さない
+// （一度だけ実行してaudio/以下にmp3を生成する。Web Speech APIへのフォールバックは無し）。
 //
 // 使い方:
 //   GOOGLE_TTS_API_KEY=xxxxx node scripts/generate-audio.js
@@ -81,7 +82,7 @@ fs.mkdirSync(outDir, { recursive: true });
 function synthesize(text) {
   const body = JSON.stringify({
     input: { text },
-    voice: { languageCode: 'en-US', name: 'en-US-Neural2-F' },
+    voice: { languageCode: 'en-US', name: 'en-US-Chirp3-HD-Zephyr' },
     audioConfig: { audioEncoding: 'MP3', speakingRate: 1.0, pitch: 0 },
   });
 
