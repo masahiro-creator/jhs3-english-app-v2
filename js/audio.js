@@ -3,6 +3,83 @@ window.AudioEngine = {
   speechRate: 0.9, // 聞き取りやすいクリアな速度
   autoPlay: true,   // 単語切り替え時の自動発音再生 (デフォルト: ON)
 
+  _voices: [],
+  _voicesReady: null,
+
+  /**
+   * 現時点で取得できる音声一覧をキャッシュに反映
+   */
+  _loadVoices() {
+    this._voices = window.speechSynthesis.getVoices();
+    return this._voices;
+  },
+
+  /**
+   * 音声リストの読み込み完了を待つ
+   * iOS Safariは初回アクセス時に getVoices() が空配列を返すことがあり、
+   * その状態で発音すると声を選べずOS標準（男声になることがある）にフォールバックしてしまう。
+   * voiceschanged を待つか、最大1.5秒でタイムアウトして進める。
+   */
+  _ensureVoicesReady() {
+    if (this._voicesReady) return this._voicesReady;
+
+    this._voicesReady = new Promise((resolve) => {
+      const existing = this._loadVoices();
+      if (existing.length > 0) {
+        resolve(existing);
+        return;
+      }
+
+      const onChanged = () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
+        clearTimeout(timeoutId);
+        resolve(this._loadVoices());
+      };
+      window.speechSynthesis.addEventListener('voiceschanged', onChanged);
+
+      const timeoutId = setTimeout(() => {
+        window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
+        resolve(this._loadVoices());
+      }, 1500);
+    });
+
+    return this._voicesReady;
+  },
+
+  /**
+   * 女性の声を優先して選択（端末・ブラウザごとに声の名前が異なるため候補を広めに用意）
+   */
+  _pickVoice(voices) {
+    const preferredVoices = [
+      'Google US English',      // PC(Chrome)の女性
+      'Microsoft Zira',         // PC(Windows)の女性
+      'Microsoft Aria',         // PC(Windows 新)の女性
+      'Samantha',               // iOS/macOSの標準女性
+      'Ava',                    // iOS/macOSの女性（新しめ）
+      'Allison',                // iOS/macOSの女性
+      'Susan',                  // iOS/macOSの女性
+      'Victoria',               // iOS/macOSの女性
+      'Karen',                  // iOS/macOSの女性（豪州）
+      'Moira',                  // iOS/macOSの女性（アイルランド）
+      'Tessa',                  // iOS/macOSの女性（南ア）
+      'Serena',                 // iOS/macOSの女性（英）
+      'Fiona',                  // iOS/macOSの女性（スコットランド）
+      'Kate',                   // iOS/macOSの女性（英）
+      'Zoe',                    // iOS/macOSの女性
+      'Google UK English Female'
+    ];
+
+    for (const name of preferredVoices) {
+      const found = voices.find(v => v.lang.startsWith('en') && v.name.includes(name));
+      if (found) return found;
+    }
+
+    // 候補にない場合も、できるだけ en-US の声から選ぶ
+    return voices.find(v => v.lang === 'en-US') ||
+           voices.find(v => v.lang.startsWith('en')) ||
+           null;
+  },
+
   /**
    * 単語・文章の英語発音再生
    * @param {string} text 発音する英語
@@ -22,43 +99,24 @@ window.AudioEngine = {
     // 不要な記号・注釈・括弧を除去
     const cleanText = text.replace(/~ing|~|\(.*\)/g, '').replace(/\//g, ' ').trim();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'en-US';
-    utterance.rate = customRate || this.speechRate;
-    utterance.pitch = 1.0;
-// 清晰な女性の英語音声を優先する設定
-    const voices = window.speechSynthesis.getVoices();
-    
-    // 女性の声のみを厳選したリスト
-    const preferredVoices = [
-      'Google US English', // 1番目: PC(Chrome)の女性
-      'Microsoft Zira',    // 2番目: PC(Windows)の女性
-      'Samantha',          // 3番目: iOSの標準女性
-      'Victoria',          // 4番目: iOSの別バージョンの女性
-      'Karen'              // 5番目: iOSのオーストラリア女性
-    ];
+    this._ensureVoicesReady().then((voices) => {
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = 'en-US';
+      utterance.rate = customRate || this.speechRate;
+      utterance.pitch = 1.0;
 
-    let englishVoice = null;
-    for (const name of preferredVoices) {
-      englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes(name));
-      if (englishVoice) break;
-    }
+      const englishVoice = this._pickVoice(voices);
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
 
-    // リストにない場合は、とにかく「アメリカ英語」の最初に見つかった声を選ぶ
-    if (!englishVoice) {
-      englishVoice = voices.find(v => v.lang === 'en-US');
-    }
+      if (onEnd) {
+        utterance.onend = onEnd;
+        utterance.onerror = onEnd;
+      }
 
-    if (englishVoice) {
-      utterance.voice = englishVoice;
-    }
-
-    if (onEnd) {
-      utterance.onend = onEnd;
-      utterance.onerror = onEnd;
-    }
-
-    window.speechSynthesis.speak(utterance);
+      window.speechSynthesis.speak(utterance);
+    });
   },
 
   /**
@@ -118,9 +176,10 @@ window.AudioEngine = {
   }
 };
 
-// iOS Safari での getVoices 読み込み待機対策
+// iOS Safari での getVoices 読み込み待機対策（ページ読み込み時点で先読みしておく）
 if ('speechSynthesis' in window) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    window.speechSynthesis.getVoices();
-  };
+  window.AudioEngine._loadVoices();
+  window.speechSynthesis.addEventListener('voiceschanged', () => {
+    window.AudioEngine._loadVoices();
+  });
 }
