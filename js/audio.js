@@ -1,6 +1,6 @@
 // Web Speech API 発音再生モジュール (iPadOS/Safari/Chrome 完全対応)
 window.AudioEngine = {
-  speechRate: 0.9, // 聞き取りやすいクリアな速度
+  speechRate: 1.5, // 聞き取りやすいクリアな速度（標準ボタンと同じ1.5倍）
   autoPlay: true,   // 単語切り替え時の自動発音再生 (デフォルト: ON)
 
   _voices: [],
@@ -169,7 +169,7 @@ window.AudioEngine = {
   },
 
   /**
-   * 音声速度設定 (0.7 = ゆっくり, 0.78 = 標準クリア, 0.95 = 早め)
+   * 音声速度設定 (1.2 = ゆっくり, 1.5 = 標準クリア, 1.8 = 早め)
    */
   setRate(rate) {
     this.speechRate = rate;
