@@ -62,24 +62,27 @@ function buildVerbCombined(present, past, participle) {
   return `${cleanPresent}, ${cleanPast}, ${cleanParticiple}.`;
 }
 
-// text(発音される文字列そのまま) -> ファイル名(拡張子なし) のMap
+// text(発音される文字列そのまま) -> { slug, type } のMap
+// type: 'word'(単語) / 'verb'(不規則動詞3活用) / 'example'(例文)
+// 例文は情報量が多く、単語・動詞3活用と同じ再生速度では速く感じるため、
+// audio.js側でtypeを見て速度を調整する。
 const entries = new Map();
 
-function addEntry(text, slug) {
+function addEntry(text, slug, type) {
   const clean = cleanText(text);
   if (!clean || entries.has(clean)) return;
-  entries.set(clean, slug);
+  entries.set(clean, { slug, type });
 }
 
 words.forEach((w) => {
-  addEntry(w.word, `word-${w.id}`);
-  addEntry(w.example, `word-${w.id}-example`);
+  addEntry(w.word, `word-${w.id}`, 'word');
+  addEntry(w.example, `word-${w.id}-example`, 'example');
 });
 
 verbs.forEach((v) => {
   const combined = buildVerbCombined(v.present, v.past, v.participle);
-  if (!entries.has(combined)) entries.set(combined, `verb-${v.id}`);
-  addEntry(v.example, `verb-${v.id}-example`);
+  if (!entries.has(combined)) entries.set(combined, { slug: `verb-${v.id}`, type: 'verb' });
+  addEntry(v.example, `verb-${v.id}-example`, 'example');
 });
 
 console.log(`生成対象: ${entries.size} 件`);
@@ -132,15 +135,24 @@ const manifest = {};
 async function main() {
   let i = 0;
   const failures = [];
-  for (const [text, slug] of entries) {
+  for (const [text, { slug, type }] of entries) {
     i++;
     const filename = `${slug}.mp3`;
     const filePath = path.join(outDir, filename);
+
+    // 既に生成済みなら再利用（API課金・呼び出し回数を節約。強制再生成したい場合は
+    // audio/ 内の該当ファイルを削除してから実行する）
+    if (fs.existsSync(filePath)) {
+      process.stdout.write(`[${i}/${entries.size}] (再利用) ${text}\n`);
+      manifest[text] = { path: `audio/${filename}`, type };
+      continue;
+    }
+
     process.stdout.write(`[${i}/${entries.size}] ${text}\n`);
     try {
       const audioContentB64 = await synthesize(text);
       fs.writeFileSync(filePath, Buffer.from(audioContentB64, 'base64'));
-      manifest[text] = `audio/${filename}`;
+      manifest[text] = { path: `audio/${filename}`, type };
     } catch (err) {
       failures.push({ text, error: err.message });
       console.error(`  失敗: ${err.message}`);

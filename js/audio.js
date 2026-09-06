@@ -1,10 +1,11 @@
 // 発音再生モジュール
-// 全ての単語・例文・不規則動詞はGoogle Cloud TTS(en-US-Chirp3-HD-Zephyr)で
+// 全ての単語・例文・不規則動詞はGoogle Cloud TTS(en-US-Neural2-F)で
 // 事前生成した音声ファイル(audio/, js/data/audioManifest.js)を再生する。
 // 端末やブラウザに依存する声のばらつきをなくすため、Web Speech APIへの
 // フォールバックは行わない。
 window.AudioEngine = {
-  speechRate: 1.5, // 聞き取りやすいクリアな速度（標準ボタンと同じ1.5倍）
+  speechRate: 1.5, // 聞き取りやすいクリアな速度（標準ボタンと同じ1.5倍。単語・不規則動詞3活用に適用）
+  exampleRateScale: 0.75, // 例文は単語より情報量が多く速く感じるため、speechRateにこの倍率をかけて再生
   autoPlay: true,   // 単語切り替え時の自動発音再生 (デフォルト: ON)
 
   _currentAudio: null,
@@ -38,17 +39,20 @@ window.AudioEngine = {
   speak(text, onEnd = null, customRate = null) {
     // 不要な記号・注釈・括弧を除去
     const cleanText = text.replace(/~ing|~|\(.*\)/g, '').replace(/\//g, ' ').trim();
-    const rate = customRate || this.speechRate;
+    const baseRate = customRate || this.speechRate;
 
     const manifest = window.AUDIO_MANIFEST;
-    const filePath = manifest && manifest[cleanText];
-    if (!filePath) {
+    const entry = manifest && manifest[cleanText];
+    if (!entry) {
       console.warn(`事前生成音声が見つかりません: "${cleanText}"`);
       if (onEnd) onEnd();
       return;
     }
 
-    this._playPregenerated(filePath, rate, onEnd);
+    // 例文は単語・動詞3活用より情報量が多く同じ倍率だと速く感じるため、少し遅くする
+    const rate = entry.type === 'example' ? baseRate * this.exampleRateScale : baseRate;
+
+    this._playPregenerated(entry.path, rate, onEnd);
   },
 
   /**
