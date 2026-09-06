@@ -81,12 +81,48 @@ window.AudioEngine = {
   },
 
   /**
+   * 事前生成済み音声（Google Cloud TTS）を再生。テキストが manifest にあればそちらを優先し、
+   * 端末やブラウザに依存せず全端末で同じ高品質な声で再生する。
+   */
+  _playPregenerated(filePath, rate, onEnd) {
+    if (this._currentAudio) {
+      this._currentAudio.pause();
+    }
+    const audio = new Audio(filePath);
+    audio.playbackRate = rate;
+    this._currentAudio = audio;
+    if (onEnd) {
+      audio.onended = onEnd;
+      audio.onerror = onEnd;
+    }
+    audio.play().catch(() => {
+      // 自動再生ポリシー等で失敗した場合はコールバックだけ呼んでおく
+      if (onEnd) onEnd();
+    });
+  },
+
+  /**
    * 単語・文章の英語発音再生
    * @param {string} text 発音する英語
    * @param {function} onEnd 再生終了時コールバック
    * @param {number} customRate 個別速度設定（省略時はデフォルト）
    */
   speak(text, onEnd = null, customRate = null) {
+    // 不要な記号・注釈・括弧を除去
+    const cleanText = text.replace(/~ing|~|\(.*\)/g, '').replace(/\//g, ' ').trim();
+    const rate = customRate || this.speechRate;
+
+    // Google Cloud TTSで事前生成した音声があれば、端末に依存せずそちらを再生
+    const manifest = window.AUDIO_MANIFEST;
+    if (manifest && manifest[cleanText]) {
+      // 再生中のWeb Speech APIをキャンセルしてから再生
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      this._playPregenerated(manifest[cleanText], rate, onEnd);
+      return;
+    }
+
     if (!('speechSynthesis' in window)) {
       console.warn('Speech Synthesis API に未対応のブラウザです。');
       if (onEnd) onEnd();
@@ -96,13 +132,10 @@ window.AudioEngine = {
     // 再生中の音声をキャンセル
     window.speechSynthesis.cancel();
 
-    // 不要な記号・注釈・括弧を除去
-    const cleanText = text.replace(/~ing|~|\(.*\)/g, '').replace(/\//g, ' ').trim();
-
     this._ensureVoicesReady().then((voices) => {
       const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = 'en-US';
-      utterance.rate = customRate || this.speechRate;
+      utterance.rate = rate;
       utterance.pitch = 1.0;
 
       const englishVoice = this._pickVoice(voices);
