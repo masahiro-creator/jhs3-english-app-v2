@@ -247,9 +247,11 @@ async function main() {
       if (type === 'verb') {
         await buildVerbClip(info.verbWords, filePath);
       } else {
-        const rawPath = path.join(tmpDir, `raw-single-${i}.mp3`);
-        await synthesizeToFile(text, rawPath);
-        trimSilence(rawPath, filePath);
+        // word/exampleは他の声(generate-audio.js)と同じく、生成した音声をそのまま保存する。
+        // 以前ここでffmpegのsilenceremoveによる無音トリミングを行っていたが、
+        // 文中のコンマ等の間を末尾の無音と誤認識して、そこで文章が切れてしまう
+        // 不具合があったため廃止した。
+        await synthesizeToFile(text, filePath);
       }
       manifest[text] = { path: `${OUT_DIR_NAME}/${filename}`, type };
     } catch (err) {
